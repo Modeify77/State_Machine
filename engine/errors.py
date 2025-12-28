@@ -50,6 +50,10 @@ class InvalidActionError(StateMachineError):
     message = "Invalid action"
 
 
+# Alias for use in templates
+IllegalActionError = InvalidActionError
+
+
 class AlreadyActedError(StateMachineError):
     """Already submitted action this phase."""
 
