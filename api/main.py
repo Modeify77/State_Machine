@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api.routes import sessions
+from api.routes import agents, sessions
 from engine.db import init_db
 from engine.errors import StateMachineError
 
@@ -15,6 +15,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(agents.router)
 app.include_router(sessions.router)
 
 
