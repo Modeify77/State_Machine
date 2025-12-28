@@ -14,6 +14,8 @@ def test_initial_state(rps):
     assert state["phase"] == "commit"
     assert state["choices"] == {"player_1": None, "player_2": None}
     assert state["result"] is None
+    assert state["round"] == 1
+    assert state["history"] == []
 
 
 def test_legal_actions_during_commit(rps):
@@ -48,14 +50,15 @@ def test_view_state_shows_own_choice(rps):
     assert view["choices"]["player_2"] is None
 
 
-def test_both_commit_resolves(rps):
-    state = {"phase": "commit", "choices": {"player_1": "rock", "player_2": None}, "result": None}
+def test_both_commit_resolves_with_winner(rps):
+    state = rps.initial_state()
+    state = rps.apply_action(state, "player_1", "rock")
     state = rps.apply_action(state, "player_2", "scissors")
     assert state["phase"] == "reveal"
     assert state["result"] == "player_1_wins"
 
 
-def test_terminal_after_resolution(rps):
+def test_terminal_after_winner(rps):
     state = {"phase": "reveal", "choices": {"player_1": "rock", "player_2": "scissors"}, "result": "player_1_wins"}
     assert rps.is_terminal(state) is True
 
@@ -65,7 +68,7 @@ def test_not_terminal_before_resolution(rps):
     assert rps.is_terminal(state) is False
 
 
-def test_no_actions_after_reveal(rps):
+def test_no_actions_after_winner(rps):
     state = {"phase": "reveal", "choices": {"player_1": "rock", "player_2": "scissors"}, "result": "player_1_wins"}
     assert rps.legal_actions(state, "player_1") == []
     assert rps.legal_actions(state, "player_2") == []
@@ -99,16 +102,100 @@ def test_player_2_wins(rps):
     assert state["result"] == "player_2_wins"
 
 
-def test_draw(rps):
+def test_draw_resets_for_next_round(rps):
+    """Draw should reset choices and increment round, not end game."""
     state = rps.initial_state()
     state = rps.apply_action(state, "player_1", "rock")
     state = rps.apply_action(state, "player_2", "rock")
-    assert state["result"] == "draw"
+
+    # Game should NOT be terminal
+    assert rps.is_terminal(state) is False
+    assert state["result"] is None
+    assert state["phase"] == "commit"
+
+    # Choices reset for next round
+    assert state["choices"] == {"player_1": None, "player_2": None}
+
+    # Round incremented
+    assert state["round"] == 2
+
+    # History records the draw
+    assert len(state["history"]) == 1
+    assert state["history"][0]["result"] == "draw"
+    assert state["history"][0]["choices"] == {"player_1": "rock", "player_2": "rock"}
+
+
+def test_draw_then_winner(rps):
+    """After a draw, players can continue until someone wins."""
+    state = rps.initial_state()
+
+    # Round 1: Draw
+    state = rps.apply_action(state, "player_1", "rock")
+    state = rps.apply_action(state, "player_2", "rock")
+    assert state["round"] == 2
+    assert rps.is_terminal(state) is False
+
+    # Round 2: Player 1 wins
+    state = rps.apply_action(state, "player_1", "paper")
+    state = rps.apply_action(state, "player_2", "rock")
+
+    assert state["result"] == "player_1_wins"
+    assert state["phase"] == "reveal"
+    assert rps.is_terminal(state) is True
+    assert len(state["history"]) == 1  # Only the draw is in history
+
+
+def test_multiple_draws_then_winner(rps):
+    """Game can have multiple draws before a winner."""
+    state = rps.initial_state()
+
+    # Round 1: Draw (rock vs rock)
+    state = rps.apply_action(state, "player_1", "rock")
+    state = rps.apply_action(state, "player_2", "rock")
+    assert state["round"] == 2
+
+    # Round 2: Draw (paper vs paper)
+    state = rps.apply_action(state, "player_1", "paper")
+    state = rps.apply_action(state, "player_2", "paper")
+    assert state["round"] == 3
+
+    # Round 3: Draw (scissors vs scissors)
+    state = rps.apply_action(state, "player_1", "scissors")
+    state = rps.apply_action(state, "player_2", "scissors")
+    assert state["round"] == 4
+    assert len(state["history"]) == 3
+
+    # Round 4: Player 2 wins
+    state = rps.apply_action(state, "player_1", "rock")
+    state = rps.apply_action(state, "player_2", "paper")
+
+    assert state["result"] == "player_2_wins"
+    assert rps.is_terminal(state) is True
+    assert len(state["history"]) == 3  # Three draws recorded
+
+
+def test_can_act_after_draw(rps):
+    """Players should be able to submit new choices after a draw."""
+    state = rps.initial_state()
+
+    # Round 1: Draw
+    state = rps.apply_action(state, "player_1", "rock")
+    state = rps.apply_action(state, "player_2", "rock")
+
+    # Both players should have legal actions again
+    assert set(rps.legal_actions(state, "player_1")) == {"rock", "paper", "scissors"}
+    assert set(rps.legal_actions(state, "player_2")) == {"rock", "paper", "scissors"}
 
 
 def test_apply_action_does_not_mutate_input(rps):
     state = rps.initial_state()
-    original_state = {"phase": "commit", "choices": {"player_1": None, "player_2": None}, "result": None}
+    original_state = {
+        "phase": "commit",
+        "choices": {"player_1": None, "player_2": None},
+        "result": None,
+        "round": 1,
+        "history": [],
+    }
     new_state = rps.apply_action(state, "player_1", "rock")
     assert state == original_state
     assert new_state != state
@@ -134,7 +221,7 @@ def test_roles(rps):
     assert rps.roles == ["player_1", "player_2"]
 
 
-def test_view_state_reveals_after_resolution(rps):
+def test_view_state_reveals_after_winner(rps):
     state = {"phase": "reveal", "choices": {"player_1": "rock", "player_2": "scissors"}, "result": "player_1_wins"}
     view = rps.view_state(state, "player_2")
     assert view["choices"]["player_1"] == "rock"
