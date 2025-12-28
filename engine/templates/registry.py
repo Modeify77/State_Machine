@@ -29,3 +29,9 @@ def get_template(template_id: str) -> StateMachine:
 def list_templates() -> list[str]:
     """Return list of registered template IDs."""
     return list(_templates.keys())
+
+
+# Register built-in templates
+from engine.templates.rps import RockPaperScissors
+
+register_template(RockPaperScissors())
