@@ -15,3 +15,14 @@ class SessionResponse(BaseModel):
 
 class SessionListResponse(BaseModel):
     sessions: list[SessionResponse]
+
+
+class SubmitActionRequest(BaseModel):
+    action: str
+    expected_tick: int | None = None
+
+
+class ActionResponse(BaseModel):
+    tick: int
+    status: str
+    state: dict

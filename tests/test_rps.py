@@ -1,6 +1,6 @@
 import pytest
 
-from engine.errors import InvalidActionError
+from engine.errors import AlreadyActedError, InvalidActionError
 from engine.templates.rps import RockPaperScissors
 
 
@@ -114,10 +114,16 @@ def test_apply_action_does_not_mutate_input(rps):
     assert new_state != state
 
 
-def test_illegal_action_raises(rps):
+def test_already_acted_raises(rps):
     state = {"phase": "commit", "choices": {"player_1": "rock", "player_2": None}, "result": None}
-    with pytest.raises(InvalidActionError):
+    with pytest.raises(AlreadyActedError):
         rps.apply_action(state, "player_1", "paper")  # Already committed
+
+
+def test_invalid_action_raises(rps):
+    state = {"phase": "commit", "choices": {"player_1": None, "player_2": None}, "result": None}
+    with pytest.raises(InvalidActionError):
+        rps.apply_action(state, "player_1", "invalid_choice")  # Not a valid choice
 
 
 def test_template_id(rps):

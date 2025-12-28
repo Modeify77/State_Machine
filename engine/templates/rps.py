@@ -1,6 +1,6 @@
 import copy
 
-from engine.errors import InvalidActionError
+from engine.errors import AlreadyActedError, InvalidActionError
 from engine.templates.base import StateMachine
 
 VALID_CHOICES = {"rock", "paper", "scissors"}
@@ -43,9 +43,17 @@ class RockPaperScissors(StateMachine):
         return ["rock", "paper", "scissors"]
 
     def apply_action(self, state: dict, role: str, action: str) -> dict:
-        # Validate action is legal
-        if action not in self.legal_actions(state, role):
-            raise InvalidActionError(f"Illegal action: {action}")
+        # Check if already committed
+        if state["choices"].get(role) is not None:
+            raise AlreadyActedError("Already submitted choice this round")
+
+        # Check if game is over
+        if state["phase"] == "reveal":
+            raise InvalidActionError("Game is already over")
+
+        # Validate action is valid choice
+        if action not in VALID_CHOICES:
+            raise InvalidActionError(f"Invalid choice: {action}")
 
         new_state = copy.deepcopy(state)
         new_state["choices"][role] = action
