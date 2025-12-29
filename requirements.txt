@@ -3,6 +3,7 @@ uvicorn[standard]
 pydantic
 aiosqlite
 python-chess
+mcp[cli]
 pytest
 pytest-asyncio
 httpx

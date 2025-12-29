@@ -25,6 +25,7 @@ from weakref import WeakSet
 from pydantic import AnyUrl
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.session import ServerSession
+from mcp.server.transport_security import TransportSecuritySettings
 
 import engine.db as db_module
 from engine.templates.registry import get_template, register_template, _templates
@@ -59,7 +60,21 @@ async def lifespan(server: FastMCP):
     yield
 
 
-mcp = FastMCP("State Machine", lifespan=lifespan)
+# Configure transport security to allow the Fly.io domain
+# Get allowed hosts from environment or use defaults
+allowed_hosts = os.environ.get("MCP_ALLOWED_HOSTS", "").split(",")
+allowed_hosts = [h.strip() for h in allowed_hosts if h.strip()]
+
+# Always allow localhost for local development
+default_hosts = ["localhost", "127.0.0.1", "state-machine-mcp.fly.dev"]
+all_allowed_hosts = list(set(default_hosts + allowed_hosts))
+
+transport_security = TransportSecuritySettings(
+    allowed_hosts=all_allowed_hosts,
+    enable_dns_rebinding_protection=True,
+)
+
+mcp = FastMCP("State Machine", lifespan=lifespan, transport_security=transport_security)
 
 
 # ============ TOOLS ============
