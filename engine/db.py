@@ -1,4 +1,5 @@
 import json
+import os
 import secrets
 import uuid
 from contextlib import asynccontextmanager
@@ -6,15 +7,20 @@ from pathlib import Path
 
 import aiosqlite
 
-DATABASE_PATH = "state_machine.db"
+# Database path from environment or default
+# For cloud deployment, set DATABASE_PATH env var to a persistent location
+DATABASE_PATH = os.environ.get("DATABASE_PATH", "state_machine.db")
 
 
 async def init_db(db_path: str = DATABASE_PATH) -> None:
-    """Initialize the database with schema."""
+    """Initialize the database with schema and enable WAL mode for concurrency."""
     schema_path = Path(__file__).parent.parent / "schema.sql"
     schema = schema_path.read_text()
 
     async with aiosqlite.connect(db_path) as db:
+        # Enable WAL mode for better concurrent access (important for SSE server)
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA busy_timeout=5000")  # Wait up to 5s for locks
         await db.executescript(schema)
         await db.commit()
 
@@ -24,6 +30,9 @@ async def get_db(db_path: str = DATABASE_PATH):
     """Async context manager for database connections."""
     db = await aiosqlite.connect(db_path)
     db.row_factory = aiosqlite.Row
+    # Ensure WAL mode and busy timeout for each connection
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA busy_timeout=5000")
     try:
         yield db
     finally:

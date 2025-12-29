@@ -33,5 +33,7 @@ def list_templates() -> list[str]:
 
 # Register built-in templates
 from engine.templates.rps import RockPaperScissors
+from engine.templates.chess import Chess
 
 register_template(RockPaperScissors())
+register_template(Chess())
