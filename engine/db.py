@@ -33,19 +33,20 @@ async def get_db(db_path: str = DATABASE_PATH):
 # Agent helpers
 
 async def create_agent(db_path: str = DATABASE_PATH) -> dict:
-    """Create a new agent with random ID and token."""
+    """Create a new agent with random ID, token, and claim_token."""
     agent_id = str(uuid.uuid4())
     token = secrets.token_urlsafe(32)
+    claim_token = secrets.token_urlsafe(16)
 
     async with get_db(db_path) as db:
         await db.execute(
-            "INSERT INTO agents (agent_id, token) VALUES (?, ?)",
-            (agent_id, token)
+            "INSERT INTO agents (agent_id, token, claim_token) VALUES (?, ?, ?)",
+            (agent_id, token, claim_token)
         )
         await db.commit()
 
         cursor = await db.execute(
-            "SELECT agent_id, token, created_at FROM agents WHERE agent_id = ?",
+            "SELECT agent_id, claim_token, created_at FROM agents WHERE agent_id = ?",
             (agent_id,)
         )
         row = await cursor.fetchone()
@@ -64,14 +65,45 @@ async def get_agent_by_id(agent_id: str, db_path: str = DATABASE_PATH) -> dict |
 
 
 async def get_agent_by_token(token: str, db_path: str = DATABASE_PATH) -> dict | None:
-    """Retrieve an agent by token."""
+    """Retrieve an agent by token (only if claimed)."""
     async with get_db(db_path) as db:
         cursor = await db.execute(
-            "SELECT agent_id, token, created_at FROM agents WHERE token = ?",
+            "SELECT agent_id, token, created_at FROM agents WHERE token = ? AND claimed = 1",
             (token,)
         )
         row = await cursor.fetchone()
         return dict(row) if row else None
+
+
+async def claim_agent(agent_id: str, claim_token: str, db_path: str = DATABASE_PATH) -> dict | None:
+    """Claim an agent's token using the claim_token. Returns token if successful, None if already claimed or invalid."""
+    async with get_db(db_path) as db:
+        # Check if agent exists and hasn't been claimed
+        cursor = await db.execute(
+            "SELECT agent_id, token, claim_token, claimed FROM agents WHERE agent_id = ?",
+            (agent_id,)
+        )
+        row = await cursor.fetchone()
+
+        if not row:
+            return None  # Agent doesn't exist
+
+        agent = dict(row)
+
+        if agent["claimed"]:
+            return None  # Already claimed
+
+        if agent["claim_token"] != claim_token:
+            return None  # Invalid claim token
+
+        # Mark as claimed
+        await db.execute(
+            "UPDATE agents SET claimed = 1 WHERE agent_id = ?",
+            (agent_id,)
+        )
+        await db.commit()
+
+        return {"agent_id": agent_id, "token": agent["token"]}
 
 
 # Session helpers
@@ -80,6 +112,7 @@ async def create_session(
     template: str,
     initial_state: dict,
     participants: dict[str, str],
+    status: str = "active",
     db_path: str = DATABASE_PATH
 ) -> dict:
     """Create a new session with participants.
@@ -88,6 +121,7 @@ async def create_session(
         template: Template ID (e.g., "chess.v1")
         initial_state: Initial game state dict
         participants: Mapping of role -> agent_id
+        status: Initial status ("active" or "waiting" for open slots)
 
     Returns:
         Session dict with session_id, template, state, status, tick, timestamps
@@ -98,8 +132,8 @@ async def create_session(
     async with get_db(db_path) as db:
         await db.execute(
             """INSERT INTO sessions (session_id, template, state, status, tick)
-               VALUES (?, ?, ?, 'active', 0)""",
-            (session_id, template, state_json)
+               VALUES (?, ?, ?, ?, 0)""",
+            (session_id, template, state_json, status)
         )
 
         for role, agent_id in participants.items():
@@ -214,6 +248,22 @@ async def get_participants(session_id: str, db_path: str = DATABASE_PATH) -> lis
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+
+async def add_participant(
+    session_id: str,
+    agent_id: str,
+    role: str,
+    db_path: str = DATABASE_PATH
+) -> dict:
+    """Add a participant to a session (for join flow)."""
+    async with get_db(db_path) as db:
+        await db.execute(
+            "INSERT INTO participants (session_id, agent_id, role) VALUES (?, ?, ?)",
+            (session_id, agent_id, role)
+        )
+        await db.commit()
+        return {"session_id": session_id, "agent_id": agent_id, "role": role}
 
 
 # Action helpers

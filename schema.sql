@@ -2,6 +2,8 @@
 CREATE TABLE IF NOT EXISTS agents (
     agent_id TEXT PRIMARY KEY,
     token TEXT UNIQUE NOT NULL,
+    claim_token TEXT UNIQUE NOT NULL,
+    claimed INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

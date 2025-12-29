@@ -18,18 +18,51 @@ async def test_db(tmp_path):
 async def test_can_create_and_retrieve_agent(test_db):
     agent = await db.create_agent(db_path=test_db)
     assert "agent_id" in agent
-    assert "token" in agent
+    assert "claim_token" in agent  # Now returns claim_token, not token
 
     retrieved = await db.get_agent_by_id(agent["agent_id"], db_path=test_db)
     assert retrieved["agent_id"] == agent["agent_id"]
-    assert retrieved["token"] == agent["token"]
 
 
-async def test_can_get_agent_by_token(test_db):
+async def test_can_claim_agent(test_db):
     agent = await db.create_agent(db_path=test_db)
 
-    retrieved = await db.get_agent_by_token(agent["token"], db_path=test_db)
+    claimed = await db.claim_agent(
+        agent["agent_id"], agent["claim_token"], db_path=test_db
+    )
+    assert claimed is not None
+    assert "token" in claimed
+    assert claimed["agent_id"] == agent["agent_id"]
+
+
+async def test_can_get_agent_by_token_after_claim(test_db):
+    agent = await db.create_agent(db_path=test_db)
+
+    # Claim first
+    claimed = await db.claim_agent(
+        agent["agent_id"], agent["claim_token"], db_path=test_db
+    )
+
+    # Now can get by token
+    retrieved = await db.get_agent_by_token(claimed["token"], db_path=test_db)
     assert retrieved["agent_id"] == agent["agent_id"]
+
+
+async def test_cannot_get_unclaimed_agent_by_token(test_db):
+    agent = await db.create_agent(db_path=test_db)
+
+    # Get raw token from DB (simulating a leak)
+    async with db.get_db(test_db) as conn:
+        cursor = await conn.execute(
+            "SELECT token FROM agents WHERE agent_id = ?",
+            (agent["agent_id"],)
+        )
+        row = await cursor.fetchone()
+        raw_token = row[0]
+
+    # Unclaimed token should not work
+    retrieved = await db.get_agent_by_token(raw_token, db_path=test_db)
+    assert retrieved is None
 
 
 async def test_get_nonexistent_agent_returns_none(test_db):

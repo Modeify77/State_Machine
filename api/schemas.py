@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 class CreateSessionRequest(BaseModel):
     template: str
-    participants: dict[str, str]  # role -> agent_id
+    participants: dict[str, str | None]  # role -> agent_id (None = open slot)
 
 
 class SessionResponse(BaseModel):

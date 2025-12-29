@@ -78,3 +78,17 @@ async def client(test_db, test_template):
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
+
+
+async def create_and_claim_agent(client: AsyncClient) -> dict:
+    """Helper to create an agent and claim its token."""
+    # Create agent (returns agent_id + claim_token)
+    create_resp = await client.post("/agents")
+    data = create_resp.json()
+
+    # Claim token
+    claim_resp = await client.post(
+        f"/agents/{data['agent_id']}/claim",
+        json={"claim_token": data["claim_token"]},
+    )
+    return claim_resp.json()  # Returns {agent_id, token}

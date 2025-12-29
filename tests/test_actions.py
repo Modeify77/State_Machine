@@ -2,6 +2,7 @@ import pytest
 
 from engine.templates.registry import register_template, _templates
 from engine.templates.rps import RockPaperScissors
+from tests.conftest import create_and_claim_agent
 
 
 @pytest.fixture
@@ -14,12 +15,9 @@ def rps_template():
 
 
 async def test_submit_valid_action_rps(client, rps_template):
-    # Create two agents
-    resp1 = await client.post("/agents")
-    agent1 = resp1.json()
-
-    resp2 = await client.post("/agents")
-    agent2 = resp2.json()
+    # Create and claim two agents
+    agent1 = await create_and_claim_agent(client)
+    agent2 = await create_and_claim_agent(client)
 
     # Create RPS session
     session_resp = await client.post(
@@ -49,12 +47,9 @@ async def test_submit_valid_action_rps(client, rps_template):
 
 
 async def test_both_players_complete_game(client, rps_template):
-    # Create two agents
-    resp1 = await client.post("/agents")
-    agent1 = resp1.json()
-
-    resp2 = await client.post("/agents")
-    agent2 = resp2.json()
+    # Create and claim two agents
+    agent1 = await create_and_claim_agent(client)
+    agent2 = await create_and_claim_agent(client)
 
     # Create RPS session
     session_resp = await client.post(
@@ -92,12 +87,9 @@ async def test_both_players_complete_game(client, rps_template):
 
 
 async def test_already_acted_rejected_rps(client, rps_template):
-    # Create two agents
-    resp1 = await client.post("/agents")
-    agent1 = resp1.json()
-
-    resp2 = await client.post("/agents")
-    agent2 = resp2.json()
+    # Create and claim two agents
+    agent1 = await create_and_claim_agent(client)
+    agent2 = await create_and_claim_agent(client)
 
     # Create RPS session
     session_resp = await client.post(
@@ -132,12 +124,9 @@ async def test_already_acted_rejected_rps(client, rps_template):
 
 
 async def test_tick_mismatch_rejected(client, rps_template):
-    # Create two agents
-    resp1 = await client.post("/agents")
-    agent1 = resp1.json()
-
-    resp2 = await client.post("/agents")
-    agent2 = resp2.json()
+    # Create and claim two agents
+    agent1 = await create_and_claim_agent(client)
+    agent2 = await create_and_claim_agent(client)
 
     # Create RPS session
     session_resp = await client.post(
@@ -165,15 +154,10 @@ async def test_tick_mismatch_rejected(client, rps_template):
 
 
 async def test_non_participant_rejected(client, rps_template):
-    # Create three agents
-    resp1 = await client.post("/agents")
-    agent1 = resp1.json()
-
-    resp2 = await client.post("/agents")
-    agent2 = resp2.json()
-
-    resp3 = await client.post("/agents")
-    agent3 = resp3.json()
+    # Create and claim three agents
+    agent1 = await create_and_claim_agent(client)
+    agent2 = await create_and_claim_agent(client)
+    agent3 = await create_and_claim_agent(client)
 
     # Create RPS session with agent1 and agent2
     session_resp = await client.post(
@@ -201,12 +185,9 @@ async def test_non_participant_rejected(client, rps_template):
 
 
 async def test_invalid_action_rejected(client, rps_template):
-    # Create two agents
-    resp1 = await client.post("/agents")
-    agent1 = resp1.json()
-
-    resp2 = await client.post("/agents")
-    agent2 = resp2.json()
+    # Create and claim two agents
+    agent1 = await create_and_claim_agent(client)
+    agent2 = await create_and_claim_agent(client)
 
     # Create RPS session
     session_resp = await client.post(
@@ -234,12 +215,9 @@ async def test_invalid_action_rejected(client, rps_template):
 
 
 async def test_action_on_completed_session_rejected(client, rps_template):
-    # Create two agents
-    resp1 = await client.post("/agents")
-    agent1 = resp1.json()
-
-    resp2 = await client.post("/agents")
-    agent2 = resp2.json()
+    # Create and claim two agents
+    agent1 = await create_and_claim_agent(client)
+    agent2 = await create_and_claim_agent(client)
 
     # Create RPS session
     session_resp = await client.post(
@@ -279,8 +257,7 @@ async def test_action_on_completed_session_rejected(client, rps_template):
 
 
 async def test_session_not_found(client, rps_template):
-    resp1 = await client.post("/agents")
-    agent1 = resp1.json()
+    agent1 = await create_and_claim_agent(client)
 
     response = await client.post(
         "/sessions/nonexistent-session-id/actions",
