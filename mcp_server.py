@@ -202,7 +202,7 @@ async def create_session(
         "template": session["template"],
         "status": session["status"],
         "tick": session["tick"],
-        "join_url": f"/sessions/{session['session_id']}/join" if has_open else None,
+        "join_url": f"https://state-machine-mcp.fly.dev/join/{session['session_id']}" if has_open else None,
     }
 
 
