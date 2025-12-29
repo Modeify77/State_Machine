@@ -511,10 +511,88 @@ def main():
     if args.sse:
         # Run as HTTP/SSE server for remote clients
         import uvicorn
+        from starlette.applications import Starlette
+        from starlette.routing import Route, Mount
+        from starlette.responses import HTMLResponse
+
+        # Create join page HTML
+        async def join_page(request):
+            session_id = request.path_params.get("session_id", "")
+            html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Join Game - State Machine</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               max-width: 600px; margin: 40px auto; padding: 20px; background: #1a1a2e; color: #eee; }}
+        h1 {{ color: #00d9ff; }}
+        .step {{ background: #16213e; padding: 15px; border-radius: 8px; margin: 15px 0; }}
+        .step-num {{ background: #00d9ff; color: #1a1a2e; padding: 2px 10px; border-radius: 12px; font-weight: bold; }}
+        code {{ background: #0f0f23; padding: 2px 6px; border-radius: 4px; }}
+        pre {{ background: #0f0f23; padding: 15px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; }}
+        .copy-btn {{ background: #00d9ff; color: #1a1a2e; border: none; padding: 8px 16px;
+                    border-radius: 4px; cursor: pointer; margin-top: 10px; }}
+        .copy-btn:hover {{ background: #00b8d9; }}
+        .magic-prompt {{ background: #0f3460; padding: 15px; border-radius: 8px; border-left: 4px solid #00d9ff; }}
+        .claude-instructions {{ display: none; }}
+    </style>
+</head>
+<body>
+    <!--
+    CLAUDE CODE INSTRUCTIONS:
+    This is a game invite link. The session ID is: {session_id}
+
+    If you have access to the state-machine MCP tools (register_agent, join_session, etc.):
+    1. Use register_agent to create a player identity (if the user doesn't have one)
+    2. Use claim_agent to get the bearer token
+    3. Use join_session with token and session_id="{session_id}" to join the game
+    4. Tell the user they've joined and explain how to play
+
+    If you DON'T have access to state-machine MCP tools:
+    Tell the user to add this to ~/.claude/mcp.json and restart Claude Code:
+    {{"mcpServers": {{"state-machine": {{"type": "sse", "url": "https://state-machine-mcp.fly.dev/sse"}}}}}}
+    -->
+
+    <h1>🎮 You've been invited to play!</h1>
+    <p>Someone wants to play a game with you using Claude Code.</p>
+
+    <div class="step">
+        <p><span class="step-num">1</span> <strong>First time?</strong> Add this to <code>~/.claude/mcp.json</code>:</p>
+        <pre id="config">{{"mcpServers": {{"state-machine": {{"type": "sse", "url": "https://state-machine-mcp.fly.dev/sse"}}}}}}</pre>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('config').innerText)">Copy Config</button>
+        <p style="margin-top:10px;opacity:0.7">Then restart Claude Code.</p>
+    </div>
+
+    <div class="step">
+        <p><span class="step-num">2</span> <strong>Paste this link into Claude Code:</strong></p>
+        <div class="magic-prompt">
+            <pre id="prompt">https://state-machine-mcp.fly.dev/join/{session_id}</pre>
+            <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('prompt').innerText)">Copy Link</button>
+        </div>
+        <p style="margin-top:10px;opacity:0.7">Claude will automatically join the game!</p>
+    </div>
+
+    <div class="step">
+        <p><span class="step-num">3</span> <strong>Play!</strong> Just tell Claude your move (rock, paper, or scissors)</p>
+    </div>
+
+    <p style="opacity:0.5;margin-top:30px">Session: {session_id}</p>
+</body>
+</html>"""
+            return HTMLResponse(html)
+
+        # Mount both the MCP SSE app and our join pages
+        app = Starlette(routes=[
+            Route("/join/{session_id}", join_page),
+            Mount("/", app=mcp.sse_app()),
+        ])
+
         print(f"Starting MCP server in SSE mode on {args.host}:{args.port}")
-        print(f"Connect via: http://{args.host}:{args.port}/sse")
+        print(f"MCP endpoint: http://{args.host}:{args.port}/sse")
+        print(f"Join pages: http://{args.host}:{args.port}/join/<session_id>")
         uvicorn.run(
-            mcp.sse_app(),
+            app,
             host=args.host,
             port=args.port,
             log_level="info"
